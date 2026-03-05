@@ -6,8 +6,13 @@ import seaborn as sns
 import pandas as pd
 from scipy.stats import median_abs_deviation
 
-from afm_learn.afm_utils import convert_with_unit, convert_scan_setting, format_func, define_percentage_threshold
-from m3util.viz.layout import scalebar, layout_fig
+from afm_learn.afm_utils import (
+    convert_scan_setting,
+    convert_with_unit,
+    define_percentage_threshold,
+    format_func,
+)
+from afm_learn.viz_layout import layout_fig, scalebar
 from afm_learn.domain_analysis import find_histogram_peaks
 
 class tip_potisition_analyzer:

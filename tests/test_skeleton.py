@@ -1,25 +1,7 @@
-import pytest
-
-from afm_learn.skeleton import fib, main
-
-__author__ = "yig319"
-__copyright__ = "Yichen Guo"
-__license__ = "MIT"
+from pathlib import Path
 
 
-def test_fib():
-    """API Tests"""
-    assert fib(1) == 1
-    assert fib(2) == 1
-    assert fib(7) == 13
-    with pytest.raises(AssertionError):
-        fib(-10)
-
-
-def test_main(capsys):
-    """CLI Tests"""
-    # capsys is a pytest fixture that allows asserts against stdout/stderr
-    # https://docs.pytest.org/en/stable/capture.html
-    main(["7"])
-    captured = capsys.readouterr()
-    assert "The 7-th Fibonacci number is 13" in captured.out
+def test_readme_mentions_package_name():
+    readme = Path(__file__).resolve().parents[1] / "README.rst"
+    content = readme.read_text(encoding="utf-8")
+    assert "AFM-tools" in content

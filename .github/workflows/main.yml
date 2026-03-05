@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-20
+    runs-on: ubuntu-22.04
     permissions:
       contents: read
     steps:
@@ -35,20 +35,98 @@ jobs:
           name: dist
           path: dist/
 
-  publish:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  release:
+    if: |
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      (
+        contains(github.event.head_commit.message, '#major') ||
+        contains(github.event.head_commit.message, '#minor') ||
+        contains(github.event.head_commit.message, '#patch')
+      )
     needs: build
-    runs-on: ubuntu-20
+    runs-on: ubuntu-22.04
     permissions:
+      contents: write
       id-token: write
     steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          name: dist
-          path: dist/
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Compute and push next version tag
+        id: version
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$COMMIT_MESSAGE" == *"#major"* ]]; then
+            bump="major"
+          elif [[ "$COMMIT_MESSAGE" == *"#minor"* ]]; then
+            bump="minor"
+          else
+            bump="patch"
+          fi
+
+          latest_tag="$(git tag --list 'v*' --sort=-v:refname | head -n 1)"
+          if [[ -z "$latest_tag" ]]; then
+            latest_tag="v0.0.0"
+          fi
+
+          version="${latest_tag#v}"
+          IFS='.' read -r major minor patch <<< "$version"
+          major="${major:-0}"
+          minor="${minor:-0}"
+          patch="${patch:-0}"
+
+          case "$bump" in
+            major)
+              major=$((major + 1))
+              minor=0
+              patch=0
+              new_tag="v${major}.${minor}"
+              ;;
+            minor)
+              minor=$((minor + 1))
+              patch=0
+              new_tag="v${major}.${minor}"
+              ;;
+            patch)
+              patch=$((patch + 1))
+              new_tag="v${major}.${minor}.${patch}"
+              ;;
+          esac
+
+          echo "bump=$bump" >> "$GITHUB_OUTPUT"
+          echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
+          echo "new_tag=$new_tag" >> "$GITHUB_OUTPUT"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git rev-parse "$new_tag" >/dev/null 2>&1; then
+            echo "Tag $new_tag already exists locally."
+          else
+            git tag "$new_tag"
+          fi
+          git push origin "$new_tag" || true
+
+      - name: Build package from tagged commit
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build twine
+          python -m build
+          python -m twine check dist/*
 
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
+          skip-existing: true

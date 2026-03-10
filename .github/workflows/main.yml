@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -75,48 +79,58 @@ jobs:
             bump="patch"
           fi
 
-          latest_tag="$(git tag --list 'v*' --sort=-v:refname | head -n 1)"
-          if [[ -z "$latest_tag" ]]; then
-            latest_tag="v0.0.0"
+          head_tag="$(git tag --points-at HEAD --list 'v*' --sort=-v:refname | head -n 1)"
+
+          if [[ -n "$head_tag" ]]; then
+            latest_tag="$head_tag"
+            new_tag="$head_tag"
+            created_tag="false"
+          else
+            latest_tag="$(git tag --list 'v*' --sort=-v:refname | head -n 1)"
+            if [[ -z "$latest_tag" ]]; then
+              latest_tag="v0.0.0"
+            fi
+
+            version="${latest_tag#v}"
+            IFS='.' read -r major minor patch <<< "$version"
+            major="${major:-0}"
+            minor="${minor:-0}"
+            patch="${patch:-0}"
+
+            case "$bump" in
+              major)
+                major=$((major + 1))
+                minor=0
+                patch=0
+                new_tag="v${major}.${minor}.${patch}"
+                ;;
+              minor)
+                minor=$((minor + 1))
+                patch=0
+                new_tag="v${major}.${minor}.${patch}"
+                ;;
+              patch)
+                patch=$((patch + 1))
+                new_tag="v${major}.${minor}.${patch}"
+                ;;
+            esac
+            created_tag="true"
           fi
-
-          version="${latest_tag#v}"
-          IFS='.' read -r major minor patch <<< "$version"
-          major="${major:-0}"
-          minor="${minor:-0}"
-          patch="${patch:-0}"
-
-          case "$bump" in
-            major)
-              major=$((major + 1))
-              minor=0
-              patch=0
-              new_tag="v${major}.${minor}"
-              ;;
-            minor)
-              minor=$((minor + 1))
-              patch=0
-              new_tag="v${major}.${minor}"
-              ;;
-            patch)
-              patch=$((patch + 1))
-              new_tag="v${major}.${minor}.${patch}"
-              ;;
-          esac
 
           echo "bump=$bump" >> "$GITHUB_OUTPUT"
           echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
           echo "new_tag=$new_tag" >> "$GITHUB_OUTPUT"
+          echo "created_tag=$created_tag" >> "$GITHUB_OUTPUT"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          if git rev-parse "$new_tag" >/dev/null 2>&1; then
-            echo "Tag $new_tag already exists locally."
-          else
+          if [[ "$created_tag" == "true" ]]; then
             git tag "$new_tag"
+            git push origin "$new_tag"
+          else
+            echo "HEAD already tagged with $new_tag; reusing tag."
           fi
-          git push origin "$new_tag" || true
 
       - name: Build package from tagged commit
         run: |

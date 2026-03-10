@@ -1,7 +1,7 @@
-from afm_learn.igor import binarywave
-from afm_learn.igor import igor
+from afm_tools.igor import binarywave
+from afm_tools.igor import igor
 
-from afm_learn.igor.binarywave import (BinHeader1, BinHeader2, BinHeader3,
+from afm_tools.igor.binarywave import (BinHeader1, BinHeader2, BinHeader3,
                                        BinHeader5, DynamicDataUnitsField,
                                        DynamicDependencyFormulaField,
                                        DynamicDimensionUnitsField,
@@ -18,7 +18,7 @@ from afm_learn.igor.binarywave import (BinHeader1, BinHeader2, BinHeader3,
                                        WaveHeader5, complexInt16, complexInt32,
                                        complexInt8, complexUInt16,
                                        complexUInt32, complexUInt8, load,)
-from afm_learn.igor.igor import (BinHeader1, BinHeader2, BinHeader3,
+from afm_tools.igor.igor import (BinHeader1, BinHeader2, BinHeader3,
                                  BinHeader5, DynamicDataUnitsField,
                                  DynamicDependencyFormulaField,
                                  DynamicDimensionUnitsField,

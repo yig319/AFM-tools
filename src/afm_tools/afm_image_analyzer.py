@@ -4,7 +4,7 @@ from matplotlib import (pyplot as plt, animation, colors, ticker, path, patches,
 import plotly.graph_objects as go
 import scipy
 from scipy import signal
-from afm_learn.afm_utils import parse_ibw
+from afm_tools.afm_utils import parse_ibw
 from scipy.ndimage import uniform_filter, label
 from skimage.measure import regionprops
 

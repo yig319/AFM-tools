@@ -18,13 +18,13 @@ def _load_module(name, path):
 
 @pytest.fixture(scope="module")
 def afm_viz_module():
-    src_dir = Path(__file__).resolve().parents[1] / "src" / "afm_learn"
+    src_dir = Path(__file__).resolve().parents[1] / "src" / "afm_tools"
 
-    pkg = types.ModuleType("afm_learn")
+    pkg = types.ModuleType("afm_tools")
     pkg.__path__ = [str(src_dir)]
-    sys.modules["afm_learn"] = pkg
+    sys.modules["afm_tools"] = pkg
 
-    utils_stub = types.ModuleType("afm_learn.afm_utils")
+    utils_stub = types.ModuleType("afm_tools.afm_utils")
 
     def _convert_scan_setting(scan_size):
         if isinstance(scan_size, dict):
@@ -44,27 +44,27 @@ def afm_viz_module():
     utils_stub.convert_with_unit = _convert_with_unit
     utils_stub.define_percentage_threshold = _define_percentage_threshold
     utils_stub.format_func = _format_func
-    sys.modules["afm_learn.afm_utils"] = utils_stub
+    sys.modules["afm_tools.afm_utils"] = utils_stub
 
-    _load_module("afm_learn.viz_layout", src_dir / "viz_layout.py")
+    _load_module("afm_tools.viz_layout", src_dir / "viz_layout.py")
 
-    domain_stub = types.ModuleType("afm_learn.domain_analysis")
+    domain_stub = types.ModuleType("afm_tools.domain_analysis")
 
     def _find_histogram_peaks(image, **kwargs):
         return np.array([float(np.median(image))]), np.array([image.size])
 
     domain_stub.find_histogram_peaks = _find_histogram_peaks
-    sys.modules["afm_learn.domain_analysis"] = domain_stub
+    sys.modules["afm_tools.domain_analysis"] = domain_stub
 
-    module = _load_module("afm_learn.afm_viz", src_dir / "afm_viz.py")
+    module = _load_module("afm_tools.afm_viz", src_dir / "afm_viz.py")
     yield module
 
     for name in [
-        "afm_learn.afm_viz",
-        "afm_learn.domain_analysis",
-        "afm_learn.viz_layout",
-        "afm_learn.afm_utils",
-        "afm_learn",
+        "afm_tools.afm_viz",
+        "afm_tools.domain_analysis",
+        "afm_tools.viz_layout",
+        "afm_tools.afm_utils",
+        "afm_tools",
     ]:
         sys.modules.pop(name, None)
 

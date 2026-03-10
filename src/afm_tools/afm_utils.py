@@ -3,7 +3,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.cm import get_cmap
 from scipy.stats import scoreatpercentile
-from afm_learn.igor.igor import load as load_ibw
+from afm_tools.igor.igor import load as load_ibw
 # from igor import binarywave
 
 def load_waves(file_ibw):

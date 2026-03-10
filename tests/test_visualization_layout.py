@@ -7,7 +7,7 @@ import pytest
 
 
 def _load_viz_layout():
-    module_path = Path(__file__).resolve().parents[1] / "src" / "afm_learn" / "viz_layout.py"
+    module_path = Path(__file__).resolve().parents[1] / "src" / "afm_tools" / "viz_layout.py"
     spec = spec_from_file_location("viz_layout_local", module_path)
     module = module_from_spec(spec)
     spec.loader.exec_module(module)

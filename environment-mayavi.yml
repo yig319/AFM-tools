@@ -1,0 +1,12 @@
+name: afm-tools-3d
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - mayavi
+  - vtk
+  - pyqt
+  - pip
+  - pip:
+      - -r requirements.txt
+      - -e .

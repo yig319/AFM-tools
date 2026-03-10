@@ -26,6 +26,13 @@ Development Setup
    pip install -r requirements-dev.txt
    pip install -e .
 
+If you need 3D (Mayavi) features locally:
+
+.. code-block:: bash
+
+   conda env create -f environment-mayavi.yml
+   conda activate afm-tools-3d
+
 Run checks:
 
 .. code-block:: bash

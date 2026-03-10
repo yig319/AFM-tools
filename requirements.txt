@@ -10,6 +10,5 @@ imutils
 opencv-python
 plotly>=5.0.0
 seaborn
-pytest
 scikit-learn
 scikit-image

@@ -1,0 +1,11 @@
+# Development dependencies for AFM-tools.
+# Runtime dependencies are inherited from requirements.txt.
+-r requirements.txt
+
+pytest
+pytest-cov
+tox
+build
+twine
+sphinx>=3.2.1
+pydata-sphinx-theme

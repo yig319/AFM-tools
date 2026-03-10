@@ -21,6 +21,10 @@ Install from PyPI:
 
    pip install AFM-tools
 
+Most users should use this pip install. It includes all core AFM/PFM features.
+3D utilities in ``afm_tools.drawing_3d`` require ``mayavi`` (VTK/Qt stack),
+which is recommended via Conda.
+
 Install from source:
 
 .. code-block:: bash
@@ -29,13 +33,41 @@ Install from source:
    cd AFM-tools
    pip install -e .
 
+Clone On A New Desktop (Core Pip Environment)
+=============================================
+
+From a fresh machine, this is the recommended setup for core AFM-tools usage:
+
+.. code-block:: bash
+
+   git clone https://github.com/yig319/AFM-tools.git
+   cd AFM-tools
+   python -m venv .venv
+   source .venv/bin/activate
+   pip install -U pip
+   pip install -r requirements-dev.txt
+   pip install -e .
+
+Optional: 3D environment (Mayavi via Conda)
+============================================
+
+If you need ``drawing_3d``/Mayavi features:
+
+.. code-block:: bash
+
+   conda env create -f environment-mayavi.yml
+   conda activate afm-tools-3d
+
+This Conda environment installs ``mayavi``/``vtk``/``pyqt`` plus AFM-tools
+dependencies. Use it when you need 3D visualization.
+
 Quick Start
 ===========
 
 .. code-block:: python
 
    import numpy as np
-   from afm_learn.afm_viz import AFMVisualizer
+   from afm_tools.afm_viz import AFMVisualizer
 
    # Example image array (replace with real AFM/PFM image data)
    img = np.random.randn(256, 256)

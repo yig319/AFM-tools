@@ -1,10 +1,20 @@
 import numpy as np
-from mayavi import mlab
-# mlab.init_notebook('x3d')
-# mlab.options.offscreen = True
-import matplotlib.pyplot as plt
+
+
+def _require_mayavi():
+    """Import mayavi lazily so base package use does not require VTK stack."""
+    try:
+        from mayavi import mlab
+    except Exception as exc:  # pragma: no cover - environment dependent
+        raise ImportError(
+            "3D plotting requires mayavi. Install with conda:\n"
+            "  conda env create -f environment-mayavi.yml\n"
+            "  conda activate afm-tools-3d"
+        ) from exc
+    return mlab
 
 def draw_surface(x, y, z, color):
+    mlab = _require_mayavi()
     if type(z) == int: 
         x_ = np.linspace(x[0], x[1], 10)
         y_ = np.linspace(y[0], y[1], 10) 
@@ -31,6 +41,7 @@ def draw_box(xrange, yrange, zrange, color):
     draw_surface(xrange[1], (yrange[0], yrange[1]), (zrange[0], zrange[1]), color)
     
 def sphere_to_surface(xrange, yrange, z, n, size, layers=1):
+    mlab = _require_mayavi()
     x1 = np.random.randint(xrange[0]+size, xrange[1]-size, size=n)
     y1 = np.random.randint(yrange[0]+size, yrange[1]-size, size=n)
     z1 = np.ones(y1.shape)*z

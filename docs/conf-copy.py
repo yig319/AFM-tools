@@ -34,7 +34,7 @@ except ImportError:
     from sphinx import apidoc
 
 output_dir = os.path.join(__location__, "api")
-module_dir = os.path.join(__location__, "../src/afm_learn")
+module_dir = os.path.join(__location__, "../src/afm_tools")
 try:
     shutil.rmtree(output_dir)
 except FileNotFoundError:
@@ -99,7 +99,7 @@ copyright = "2026, Yichen Guo and contributors"
 # If you don’t need the separation provided between version and release,
 # just set them both to the same value.
 try:
-    from afm_learn import __version__ as version
+    from afm_tools import __version__ as version
 except ImportError:
     version = ""
 

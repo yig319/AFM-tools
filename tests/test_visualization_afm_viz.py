@@ -101,6 +101,67 @@ def test_show_pfm_images_saves_figure(afm_viz_module, no_show, tmp_path):
     assert out_file.stat().st_size > 0
 
 
+def test_plot_afm_channels_accepts_loaded_dataset(afm_viz_module, no_show):
+    dataset = types.SimpleNamespace(
+        data=np.random.rand(16, 16, 3),
+        labels=["Height", "Amplitude", "Phase"],
+        scan_size_m={"image_size": 16, "scale_size": 5, "units": "um"},
+        sample="test_sample",
+        path=Path("test_sample.ibw"),
+    )
+
+    fig, axes = afm_viz_module.plot_afm_channels(
+        dataset,
+        selected_channel_indices=[0, 2],
+        n_cols=2,
+        scalebar=False,
+        colorbar_setting={"visible": False},
+        show_sample_title=True,
+    )
+
+    assert fig is not None
+    assert axes.shape == (1, 2)
+    assert axes[0, 0].get_title() == "0: Height"
+    assert axes[0, 1].get_title() == "2: Phase"
+    assert fig._suptitle.get_text() == "test_sample"
+
+
+def test_afm_metric_helpers_are_public(afm_viz_module):
+    image = np.array([[0.0, 1.0], [2.0, 3.0]])
+
+    assert afm_viz_module.compute_rms_metric(image) == pytest.approx(np.sqrt(1.25))
+    metric_text, unit = afm_viz_module.describe_afm_metric("Phase", image)
+
+    assert metric_text == "1.12 deg"
+    assert unit == "deg"
+    assert afm_viz_module.should_show_metric_overlay("Height", multiple_plots=True)
+    assert not afm_viz_module.should_show_metric_overlay("Phase", multiple_plots=True)
+
+
+def test_render_afm_preview_returns_status_and_overlay(afm_viz_module, no_show):
+    height = np.linspace(0.0, 1e-9, 64).reshape(8, 8)
+    phase = np.linspace(-2.0, 2.0, 64).reshape(8, 8)
+    dataset = afm_viz_module.AfmDataset(
+        file_path="demo.ibw",
+        images=np.dstack([height, phase]),
+        sample_name="demo",
+        labels=["Height", "Phase"],
+        scan_size={"image_size": 8, "scale_size": 2, "units": "um"},
+    )
+
+    rendered = afm_viz_module.render_afm_preview(
+        dataset,
+        afm_viz_module.AfmPreviewOptions(
+            selected_channel_indices=[0],
+            show_metric_overlay=True,
+        ),
+    )
+
+    assert rendered.figure is not None
+    assert rendered.message.startswith("AFM preview updated for Height")
+    assert any(text.get_text().startswith("RMS =") for text in rendered.figure.axes[0].texts)
+
+
 def test_df_scatter_simple_mode_runs(afm_viz_module, no_show):
     df = pd.DataFrame(
         {

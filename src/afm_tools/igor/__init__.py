@@ -1,48 +1,5 @@
-from afm_tools.igor import binarywave
-from afm_tools.igor import igor
+"""Bundled Igor Binary Wave readers used by :mod:`afm_tools.afm_utils`."""
 
-from afm_tools.igor.binarywave import (BinHeader1, BinHeader2, BinHeader3,
-                                       BinHeader5, DynamicDataUnitsField,
-                                       DynamicDependencyFormulaField,
-                                       DynamicDimensionUnitsField,
-                                       DynamicLabelsField, DynamicStringField,
-                                       DynamicStringIndicesDataField,
-                                       DynamicVersionField,
-                                       DynamicWaveDataField1,
-                                       DynamicWaveDataField5, DynamicWaveField,
-                                       DynamicWaveNoteField, MAXDIMS,
-                                       MAX_UNIT_CHARS, MAX_WAVE_NAME2,
-                                       MAX_WAVE_NAME5, NullStaticStringField,
-                                       StaticStringField, TYPE_TABLE, Wave,
-                                       Wave1, Wave2, Wave3, Wave5, WaveHeader2,
-                                       WaveHeader5, complexInt16, complexInt32,
-                                       complexInt8, complexUInt16,
-                                       complexUInt32, complexUInt8, load,)
-from afm_tools.igor.igor import (BinHeader1, BinHeader2, BinHeader3,
-                                 BinHeader5, DynamicDataUnitsField,
-                                 DynamicDependencyFormulaField,
-                                 DynamicDimensionUnitsField,
-                                 DynamicLabelsField, DynamicStringField,
-                                 DynamicStringIndicesDataField,
-                                 DynamicVersionField, DynamicWaveDataField1,
-                                 DynamicWaveDataField5, DynamicWaveField,
-                                 DynamicWaveNoteField, MAXDIMS, MAX_UNIT_CHARS,
-                                 MAX_WAVE_NAME2, MAX_WAVE_NAME5,
-                                 NullStaticStringField, StaticStringField,
-                                 TYPE_TABLE, Wave, Wave1, Wave2, Wave3, Wave5,
-                                 WaveHeader2, WaveHeader5, complexInt16,
-                                 complexInt32, complexInt8, complexUInt16,
-                                 complexUInt32, complexUInt8, load, save,)
+from . import binarywave, igor
 
-__all__ = ['BinHeader1', 'BinHeader2', 'BinHeader3', 'BinHeader5',
-           'DynamicDataUnitsField', 'DynamicDependencyFormulaField',
-           'DynamicDimensionUnitsField', 'DynamicLabelsField',
-           'DynamicStringField', 'DynamicStringIndicesDataField',
-           'DynamicVersionField', 'DynamicWaveDataField1',
-           'DynamicWaveDataField5', 'DynamicWaveField', 'DynamicWaveNoteField',
-           'MAXDIMS', 'MAX_UNIT_CHARS', 'MAX_WAVE_NAME2', 'MAX_WAVE_NAME5',
-           'NullStaticStringField', 'StaticStringField', 'TYPE_TABLE', 'Wave',
-           'Wave1', 'Wave2', 'Wave3', 'Wave5', 'WaveHeader2', 'WaveHeader5',
-           'binarywave', 'complexInt16', 'complexInt32', 'complexInt8',
-           'complexUInt16', 'complexUInt32', 'complexUInt8', 'igor', 'load',
-           'save']
+__all__ = ["binarywave", "igor"]

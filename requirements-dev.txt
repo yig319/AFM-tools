@@ -1,5 +1,5 @@
-# Development dependencies for AFM-tools.
-# Runtime dependencies are inherited from requirements.txt.
+# Development requirements.
+# Includes runtime dependencies plus test/build/doc tooling.
 -r requirements.txt
 
 pytest

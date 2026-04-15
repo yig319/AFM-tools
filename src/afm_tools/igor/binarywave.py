@@ -819,3 +819,5 @@ def load(filename):
     finally:
         if not hasattr(filename, 'read'):
             f.close()
+
+    return data

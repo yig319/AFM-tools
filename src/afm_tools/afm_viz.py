@@ -6,8 +6,9 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from .afm_utils import convert_scan_setting, convert_with_unit, define_percentage_threshold
+from .afm_utils import convert_scan_setting, convert_with_unit, define_percentage_threshold, format_func
 from .viz_layout import layout_fig, scalebar as add_scalebar
 
 
@@ -16,6 +17,15 @@ class AFMVisualizer:
 
     The call signature follows the usage in PLD_workflow: create one visualizer
     and call ``viz(..., fig=figure, ax=axis, cbar_unit="nm")`` for each channel.
+
+    Colorbar styling is controlled through ``colorbar_setting``. The default
+    style is the compact legacy AFM/PFM look: a narrow right-side colorbar,
+    inward ticks, small tick labels, and the unit printed above the bar. Set
+    ``{"style": "matplotlib"}`` to use Matplotlib's standard colorbar with
+    the unit as the side label. Useful compact-style keys include ``size``,
+    ``pad``, ``tick_direction``, ``tick_labelsize``, ``tick_length``,
+    ``tick_pad``, ``unit_position`` (``"top"`` or ``"side"``),
+    ``unit_fontsize``, ``unit_pad``, and ``tick_unit``.
     """
 
     def __init__(
@@ -31,6 +41,9 @@ class AFMVisualizer:
         self.zero_mean = zero_mean
         self.scalebar = scalebar
         self.debug = debug
+
+    def _setting(self, key, default=None):
+        return self.colorbar_setting.get(key, default)
 
     def _clim(self, image):
         setting = self.colorbar_setting
@@ -93,6 +106,55 @@ class AFMVisualizer:
             return image * scale
         return image
 
+    def _add_colorbar(self, fig, ax, im, unit: str | None):
+        """Add a colorbar using configurable compact or Matplotlib styling."""
+        if not self._setting("visible", True):
+            return None
+
+        unit = unit or ""
+        style = self._setting("style", self._setting("colorbar_style", "compact"))
+        unit_position = self._setting("unit_position", "top")
+
+        if style == "matplotlib":
+            colorbar = fig.colorbar(
+                im,
+                ax=ax,
+                fraction=self._setting("fraction", 0.046),
+                pad=self._setting("pad", 0.04),
+            )
+            if unit:
+                colorbar.set_label(unit)
+            return colorbar
+
+        if style != "compact":
+            raise ValueError("colorbar_setting['style'] must be 'compact' or 'matplotlib'")
+
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes(
+            "right",
+            size=self._setting("size", "5%"),
+            pad=self._setting("pad", 0.05),
+        )
+        tick_unit = unit if self._setting("tick_unit", False) else ""
+        formatter = plt.FuncFormatter(lambda value, _tick_number: format_func(value, unit=tick_unit))
+        colorbar = fig.colorbar(im, cax=cax, format=formatter)
+        colorbar.ax.yaxis.set_tick_params(
+            pad=self._setting("tick_pad", 1),
+            labelsize=self._setting("tick_labelsize", 7),
+            direction=self._setting("tick_direction", "in"),
+            length=self._setting("tick_length", 2),
+        )
+        if unit and unit_position == "top":
+            cax.set_title(
+                unit,
+                loc=self._setting("unit_loc", "center"),
+                pad=self._setting("unit_pad", 1),
+                fontsize=self._setting("unit_fontsize", 7),
+            )
+        elif unit and unit_position == "side":
+            colorbar.set_label(unit)
+        return colorbar
+
     def viz(
         self,
         img,
@@ -133,10 +195,7 @@ class AFMVisualizer:
         if title:
             ax.set_title(title)
 
-        if self.colorbar_setting.get("visible", True):
-            colorbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-            if cbar_unit:
-                colorbar.set_label(cbar_unit)
+        self._add_colorbar(fig, ax, im, cbar_unit)
 
         if self.scalebar and scan_size is not None:
             setting = self._scan_setting(scan_size, image)
@@ -170,10 +229,15 @@ class AfmPreviewOptions:
 
     ``selected_channel_indices`` controls which channels appear. Passing an
     empty list chooses a sensible default channel from the labels.
+    ``colorbar_setting`` is merged with :func:`default_preview_colorbar_setting`,
+    so the compact AFM colorbar style remains the default while callers can
+    override individual style choices, for example ``{"style": "matplotlib"}``.
     """
 
     selected_channel_indices: list[int]
     show_metric_overlay: bool = False
+    colorbar_setting: dict | None = None
+    cmap: str = "viridis"
 
 
 @dataclass(slots=True)
@@ -211,6 +275,40 @@ def preferred_channel_index(labels: list[str]) -> int:
     return 0
 
 
+def default_preview_colorbar_setting(overrides: dict | None = None) -> dict:
+    """Return the default AFM/PFM preview colorbar style.
+
+    The default is the compact style used by the original PLD AFM/PFM
+    previews: percentile color limits, inward ticks, small labels, and the unit
+    above the colorbar. Pass ``{"style": "matplotlib"}`` to switch to
+    Matplotlib's standard side-label colorbar, or pass individual compact keys
+    such as ``tick_labelsize``, ``tick_pad``, ``unit_position``, ``size``, and
+    ``pad`` to tune the restored style.
+    """
+
+    setting = {
+        "colorbar_type": "percent",
+        "colorbar_range": (0.2, 99.8),
+        "outliers_std": 5,
+        "symmetric_clim": False,
+        "visible": True,
+        "style": "compact",
+        "size": "5%",
+        "pad": 0.05,
+        "tick_direction": "in",
+        "tick_labelsize": 7,
+        "tick_length": 2,
+        "tick_pad": 1,
+        "unit_position": "top",
+        "unit_fontsize": 7,
+        "unit_pad": 1,
+        "tick_unit": False,
+    }
+    if overrides:
+        setting.update(overrides)
+    return setting
+
+
 def render_afm_preview(dataset: AfmDataset, options: AfmPreviewOptions) -> AfmPreviewRender:
     """Render an AFM/PFM preview using the same style as PLD_workflow.
 
@@ -220,13 +318,8 @@ def render_afm_preview(dataset: AfmDataset, options: AfmPreviewOptions) -> AfmPr
     downstream projects do not need to copy plotting logic.
     """
     visualizer = AFMVisualizer(
-        colorbar_setting={
-            "colorbar_type": "percent",
-            "colorbar_range": (0.2, 99.8),
-            "outliers_std": 5,
-            "symmetric_clim": False,
-            "visible": True,
-        },
+        colorbar_setting=default_preview_colorbar_setting(options.colorbar_setting),
+        cmap=options.cmap,
         zero_mean=False,
         scalebar=True,
         debug=False,
@@ -592,6 +685,7 @@ __all__ = [
     "add_metric_overlay",
     "compute_rms_metric",
     "convert_with_unit",
+    "default_preview_colorbar_setting",
     "describe_afm_metric",
     "df_scatter",
     "load_afm_dataset",

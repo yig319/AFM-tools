@@ -92,6 +92,44 @@ def test_afm_visualizer_viz_returns_axes_and_title(afm_viz_module):
     assert len(ax.texts) >= 1
 
 
+def test_afm_visualizer_uses_compact_colorbar_by_default(afm_viz_module):
+    img = np.linspace(0.0, 1.0, 64).reshape(8, 8)
+    viz = afm_viz_module.AFMVisualizer(
+        colorbar_setting={
+            "colorbar_type": "percent",
+            "colorbar_range": (0, 100),
+            "visible": True,
+        },
+        scalebar=False,
+    )
+
+    fig, _ax = viz.viz(img=img, cbar_unit="nm")
+    colorbar_axis = fig.axes[-1]
+
+    assert colorbar_axis.get_title() == "nm"
+    assert colorbar_axis.yaxis.majorTicks[0]._tickdir == "in"
+    assert colorbar_axis.yaxis.majorTicks[0].label1.get_fontsize() == 7
+
+
+def test_afm_visualizer_can_use_matplotlib_colorbar_style(afm_viz_module):
+    img = np.linspace(0.0, 1.0, 64).reshape(8, 8)
+    viz = afm_viz_module.AFMVisualizer(
+        colorbar_setting={
+            "colorbar_type": "percent",
+            "colorbar_range": (0, 100),
+            "visible": True,
+            "style": "matplotlib",
+        },
+        scalebar=False,
+    )
+
+    fig, _ax = viz.viz(img=img, cbar_unit="nm")
+    colorbar_axis = fig.axes[-1]
+
+    assert colorbar_axis.get_title() == ""
+    assert colorbar_axis.get_ylabel() == "nm"
+
+
 def test_show_pfm_images_saves_figure(afm_viz_module, no_show, tmp_path):
     imgs = np.random.rand(16, 16, 6)
     labels = [f"img_{i}" for i in range(6)]

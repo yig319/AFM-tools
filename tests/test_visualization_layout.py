@@ -2,6 +2,7 @@ from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from matplotlib.transforms import Bbox
 import numpy as np
 import pytest
 
@@ -35,6 +36,20 @@ def test_scalebar_adds_patch_and_text():
     mod.scalebar(ax, image_size=32, scale_size=8, units="nm", loc="br")
     assert len(ax.patches) >= 1
     assert len(ax.texts) >= 1
+
+
+def test_scalebar_label_stays_clear_of_bar():
+    mod = _load_viz_layout()
+    fig, ax = plt.subplots(figsize=(4, 4))
+    ax.imshow(np.random.rand(64, 64))
+    mod.scalebar(ax, image_size=64, scale_size=20, units="µm", loc="br")
+
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    patch_box = ax.patches[-1].get_window_extent(renderer)
+    text_box = ax.texts[-1].get_window_extent(renderer)
+
+    assert not Bbox.overlaps(patch_box, text_box)
 
 
 def test_scalebar_invalid_location_raises():

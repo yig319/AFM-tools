@@ -25,7 +25,10 @@ class AFMVisualizer:
     the unit as the side label. Useful compact-style keys include ``size``,
     ``pad``, ``tick_direction``, ``tick_labelsize``, ``tick_length``,
     ``tick_pad``, ``unit_position`` (``"top"`` or ``"side"``),
-    ``unit_fontsize``, ``unit_pad``, and ``tick_unit``.
+    ``unit_fontsize``, ``unit_pad``, ``tick_unit``, ``outlier_method``, and
+    ``scale_image``. Scale-bar placement is controlled through
+    ``scalebar_setting``; increase ``text_offset`` to move the scale label
+    farther from the bar.
     """
 
     def __init__(
@@ -34,12 +37,14 @@ class AFMVisualizer:
         cmap: str = "viridis",
         zero_mean: bool = False,
         scalebar: bool = True,
+        scalebar_setting: dict | None = None,
         debug: bool = False,
     ):
         self.colorbar_setting = colorbar_setting or {}
         self.cmap = cmap
         self.zero_mean = zero_mean
         self.scalebar = scalebar
+        self.scalebar_setting = scalebar_setting or {}
         self.debug = debug
 
     def _setting(self, key, default=None):
@@ -54,8 +59,16 @@ class AFMVisualizer:
 
         outliers_std = setting.get("outliers_std")
         if outliers_std is not None:
-            center = np.nanmean(finite)
-            spread = np.nanstd(finite)
+            if setting.get("outlier_method", "mad") == "mad":
+                center = np.nanmedian(finite)
+                spread = np.nanmedian(np.abs(finite - center))
+                if np.isfinite(spread) and spread > 0:
+                    spread *= 1.4826
+                else:
+                    spread = np.nanstd(finite)
+            else:
+                center = np.nanmean(finite)
+                spread = np.nanstd(finite)
             if np.isfinite(spread) and spread > 0:
                 clipped = finite[np.abs(finite - center) <= outliers_std * spread]
                 if clipped.size:
@@ -76,16 +89,9 @@ class AFMVisualizer:
     def _scan_setting(self, scan_size, image):
         if scan_size is None:
             return None
-        if isinstance(scan_size, (int, float, np.floating)):
-            label = convert_with_unit(float(scan_size))
-            parts = label.split()
-            if len(parts) == 2:
-                scale_size, units = float(parts[0]), parts[1]
-            else:
-                scale_size, units = float(scan_size), "m"
-            return {"image_size": image.shape[1], "scale_size": scale_size, "units": units}
-
         setting = convert_scan_setting(scan_size)
+        setting = dict(setting)
+        setting["pixel_size"] = image.shape[1]
         if "image_size" not in setting or setting["image_size"] is None:
             setting["image_size"] = image.shape[1]
         return setting
@@ -93,7 +99,9 @@ class AFMVisualizer:
     def _scale_for_unit(self, image, cbar_unit: str | None):
         if cbar_unit is None:
             return image
-        unit_scale = {"nm": 1e9, "um": 1e6, "mm": 1e3}
+        if not self._setting("scale_image", True):
+            return image
+        unit_scale = {"fm": 1e15, "pm": 1e12, "nm": 1e9, "µm": 1e6, "um": 1e6, "mm": 1e3}
         scale = unit_scale.get(cbar_unit)
         if scale is None:
             return image
@@ -172,7 +180,7 @@ class AFMVisualizer:
         the scale bar, an existing ``fig``/``ax`` if you want layout control,
         and per-plot display choices such as ``title``, ``cmap``, and
         ``cbar_unit``. Height-like data stored in meters is scaled for colorbar
-        units of ``"nm"``, ``"um"``, or ``"mm"``.
+        units of ``"nm"``, ``"µm"``, or ``"mm"``.
         """
         image = np.asarray(img, dtype=float)
         image = self._scale_for_unit(image, cbar_unit)
@@ -199,11 +207,14 @@ class AFMVisualizer:
 
         if self.scalebar and scan_size is not None:
             setting = self._scan_setting(scan_size, image)
+            scalebar_setting = default_preview_scalebar_setting(self.scalebar_setting)
             add_scalebar(
                 ax,
                 image_size=setting["image_size"],
                 scale_size=setting["scale_size"],
                 units=setting.get("units", ""),
+                pixel_size=setting.get("pixel_size", image.shape[1]),
+                **scalebar_setting,
             )
         return fig, ax
 
@@ -237,6 +248,7 @@ class AfmPreviewOptions:
     selected_channel_indices: list[int]
     show_metric_overlay: bool = False
     colorbar_setting: dict | None = None
+    scalebar_setting: dict | None = None
     cmap: str = "viridis"
 
 
@@ -283,13 +295,16 @@ def default_preview_colorbar_setting(overrides: dict | None = None) -> dict:
     above the colorbar. Pass ``{"style": "matplotlib"}`` to switch to
     Matplotlib's standard side-label colorbar, or pass individual compact keys
     such as ``tick_labelsize``, ``tick_pad``, ``unit_position``, ``size``, and
-    ``pad`` to tune the restored style.
+    ``pad`` to tune the restored style. Set ``scale_image=False`` and
+    ``tick_unit=True`` to keep data in raw meters and scale only tick labels,
+    matching the oldest AFM visualizer behavior.
     """
 
     setting = {
         "colorbar_type": "percent",
         "colorbar_range": (0.2, 99.8),
         "outliers_std": 5,
+        "outlier_method": "mad",
         "symmetric_clim": False,
         "visible": True,
         "style": "compact",
@@ -303,6 +318,29 @@ def default_preview_colorbar_setting(overrides: dict | None = None) -> dict:
         "unit_fontsize": 7,
         "unit_pad": 1,
         "tick_unit": False,
+        "scale_image": True,
+    }
+    if overrides:
+        setting.update(overrides)
+    return setting
+
+
+def default_preview_scalebar_setting(overrides: dict | None = None) -> dict:
+    """Return the default AFM/PFM scale-bar style.
+
+    ``text_offset`` controls the distance between the label and the bar, and
+    ``text_position`` can be ``"above"`` or ``"below"``. The default keeps the
+    label just above the bar, which avoids overlap near the image bottom.
+    """
+
+    setting = {
+        "loc": "br",
+        "color": "white",
+        "linewidth": 0,
+        "text_color": None,
+        "text_fontsize": 9,
+        "text_offset": 0.35,
+        "text_position": "above",
     }
     if overrides:
         setting.update(overrides)
@@ -317,11 +355,14 @@ def render_afm_preview(dataset: AfmDataset, options: AfmPreviewOptions) -> AfmPr
     colorbar units, and optional RMS overlays in one package-level function so
     downstream projects do not need to copy plotting logic.
     """
+    colorbar_setting = default_preview_colorbar_setting(options.colorbar_setting)
+    colorbar_setting["scale_image"] = False
     visualizer = AFMVisualizer(
-        colorbar_setting=default_preview_colorbar_setting(options.colorbar_setting),
+        colorbar_setting=colorbar_setting,
         cmap=options.cmap,
         zero_mean=False,
         scalebar=True,
+        scalebar_setting=default_preview_scalebar_setting(options.scalebar_setting),
         debug=False,
     )
 
@@ -392,15 +433,18 @@ def plot_afm_channels(
     )
     axes_flat = axes.ravel()
 
-    visualizer = AFMVisualizer(
-        colorbar_setting=colorbar_setting
-        or {
+    plot_colorbar_setting = colorbar_setting or {
             "colorbar_type": "percent",
             "colorbar_range": (2, 98),
             "outliers_std": 5,
             "symmetric_clim": True,
             "visible": True,
-        },
+        }
+    plot_colorbar_setting = dict(plot_colorbar_setting)
+    plot_colorbar_setting["scale_image"] = False
+
+    visualizer = AFMVisualizer(
+        colorbar_setting=plot_colorbar_setting,
         zero_mean=zero_mean,
         scalebar=scalebar,
         debug=False,
@@ -410,10 +454,12 @@ def plot_afm_channels(
     for axis, channel_index in zip(axes_flat, channel_indices):
         channel_label = labels[channel_index] if channel_index < len(labels) else f"channel_{channel_index}"
         image = _afm_channel(images, channel_index)
-        metric_text, inferred_unit = describe_afm_metric(channel_label, image)
+        display_image, metric_text, inferred_unit = prepare_afm_channel_display(channel_label, image)
         cbar_unit = channel_cbar_units.get(channel_label, default_cbar_unit or inferred_unit)
+        if cbar_unit != inferred_unit:
+            display_image = scale_afm_channel_for_unit(channel_label, image, cbar_unit)
         visualizer.viz(
-            img=image,
+            img=display_image,
             scan_size=scan_size,
             fig=figure,
             ax=axis,
@@ -483,9 +529,9 @@ def _render_multi_channel_preview(dataset, options, visualizer, channel_indices)
     for axis, channel_index in zip(axes_flat, channel_indices):
         channel_label = dataset.labels[channel_index]
         image = np.asarray(dataset.images[:, :, channel_index], dtype=float)
-        metric_text, colorbar_unit = describe_afm_metric(channel_label, image)
+        display_image, metric_text, colorbar_unit = prepare_afm_channel_display(channel_label, image)
         visualizer.viz(
-            img=image,
+            img=display_image,
             scan_size=dataset.scan_size,
             fig=figure,
             ax=axis,
@@ -506,11 +552,11 @@ def _render_multi_channel_preview(dataset, options, visualizer, channel_indices)
 def _render_single_channel_preview(dataset, options, visualizer, channel_index):
     channel_label = dataset.labels[channel_index]
     image = np.asarray(dataset.images[:, :, channel_index], dtype=float)
-    metric_text, colorbar_unit = describe_afm_metric(channel_label, image)
+    display_image, metric_text, colorbar_unit = prepare_afm_channel_display(channel_label, image)
 
     figure, axis = plt.subplots(figsize=(6.4, 4.8))
     visualizer.viz(
-        img=image,
+        img=display_image,
         scan_size=dataset.scan_size,
         fig=figure,
         ax=axis,
@@ -551,15 +597,80 @@ def compute_rms_metric(image: np.ndarray) -> float:
 
 def describe_afm_metric(channel_label: str, image: np.ndarray) -> tuple[str, str]:
     """Return formatted RMS text and the colorbar unit for one channel."""
-    rms_value = compute_rms_metric(image)
-    normalized = channel_label.strip().lower()
-
-    if normalized in {"phase", "latphase"}:
+    display_image, unit = scale_afm_channel_for_display(channel_label, image)
+    rms_value = compute_rms_metric(display_image)
+    if unit == "deg":
         return f"{rms_value:.2f} deg", "deg"
+    return f"{rms_value:.3g} {unit}", unit
 
-    metric_text = convert_with_unit(rms_value)
-    unit = metric_text.split()[-1] if " " in metric_text else "nm"
-    return metric_text, unit
+
+def prepare_afm_channel_display(channel_label: str, image: np.ndarray) -> tuple[np.ndarray, str, str]:
+    """Return display image, metric text, and colorbar unit for one channel."""
+    display_image, unit = scale_afm_channel_for_display(channel_label, image)
+    metric_text, _unit = describe_afm_metric(channel_label, image)
+    return display_image, metric_text, unit
+
+
+def scale_afm_channel_for_display(channel_label: str, image: np.ndarray) -> tuple[np.ndarray, str]:
+    """Scale one raw AFM/PFM channel into its default display unit."""
+    unit = infer_afm_channel_unit(channel_label, image)
+    return scale_afm_channel_for_unit(channel_label, image, unit), unit
+
+
+def scale_afm_channel_for_unit(channel_label: str, image: np.ndarray, unit: str) -> np.ndarray:
+    """Scale one raw AFM/PFM channel for display in ``unit``."""
+    values = np.asarray(image, dtype=float)
+    normalized = channel_label.strip().lower().replace(" ", "")
+    if unit == "deg":
+        return values
+
+    if "amplitude" in normalized and unit == "nm":
+        finite = values[np.isfinite(values)]
+        max_abs = float(np.nanmax(np.abs(finite))) if finite.size else 0.0
+        if max_abs == 0:
+            return values
+        if max_abs < 1e-6:
+            return values * 1e9
+        if max_abs < 1:
+            return values * 1e3
+        return values
+
+    unit_scale = {"fm": 1e15, "pm": 1e12, "nm": 1e9, "µm": 1e6, "um": 1e6, "mm": 1e3}
+    scale = unit_scale.get(unit)
+    return values * scale if scale is not None else values
+
+
+def infer_afm_channel_unit(channel_label: str, image: np.ndarray, *, metric_value: float | None = None) -> str:
+    """Infer a display unit for an AFM/PFM channel.
+
+    Phase-like channels use degrees. Lateral-amplitude channels default to nm,
+    while vertical amplitude defaults to pm, matching the manually tuned
+    AFM/PFM visualizer style.
+    Height, Z sensor, and deflection channels use adaptive length units chosen
+    from image variation, avoiding a fallback to raw meters.
+    """
+
+    normalized = channel_label.strip().lower().replace(" ", "")
+    if "phase" in normalized:
+        return "deg"
+    if normalized == "latamplitude":
+        return "nm"
+    if "amplitude" in normalized:
+        return "pm"
+
+    length_keywords = ("height", "zsensor", "deflection")
+    if any(keyword in normalized for keyword in length_keywords):
+        reference = metric_value
+        if reference is None or not np.isfinite(reference) or reference == 0:
+            values = np.asarray(image, dtype=float)
+            finite = values[np.isfinite(values)]
+            reference = float(np.nanmax(np.abs(finite))) if finite.size else 0.0
+        unit_text = convert_with_unit(float(reference))
+        return unit_text.split()[-1] if " " in unit_text else "nm"
+
+    metric = compute_rms_metric(image) if metric_value is None else float(metric_value)
+    unit_text = convert_with_unit(metric)
+    return unit_text.split()[-1] if " " in unit_text else ""
 
 
 def should_show_metric_overlay(channel_label: str, *, multiple_plots: bool) -> bool:
@@ -686,12 +797,17 @@ __all__ = [
     "compute_rms_metric",
     "convert_with_unit",
     "default_preview_colorbar_setting",
+    "default_preview_scalebar_setting",
     "describe_afm_metric",
     "df_scatter",
+    "infer_afm_channel_unit",
     "load_afm_dataset",
     "plot_afm_channels",
+    "prepare_afm_channel_display",
     "preferred_channel_index",
     "render_afm_preview",
+    "scale_afm_channel_for_display",
+    "scale_afm_channel_for_unit",
     "should_show_metric_overlay",
     "show_pfm_images",
     "tip_potisition_analyzer",

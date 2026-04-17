@@ -31,8 +31,20 @@ def afm_viz_module():
             return scan_size
         return {"image_size": scan_size[0], "scale_size": scan_size[1], "units": scan_size[2]}
 
-    def _convert_with_unit(value):
-        return f"{value:.2f}"
+    def _convert_with_unit(value, unit="m"):
+        if unit == "m":
+            if abs(value) < 1e-9:
+                return f"{value * 1e12:.2f} pm"
+            if abs(value) < 1e-6:
+                return f"{value * 1e9:.2f} nm"
+            return f"{value * 1e6:.2f} µm"
+        if unit == "deg":
+            return f"{value:.2f} deg"
+        if unit == "nm":
+            return f"{value * 1e9:.2f} nm"
+        if unit == "pm":
+            return f"{value * 1e12:.2f} pm"
+        return f"{value:.2f} {unit}".strip()
 
     def _define_percentage_threshold(image, percentage=(2, 98)):
         return np.percentile(image, percentage)
@@ -143,7 +155,7 @@ def test_plot_afm_channels_accepts_loaded_dataset(afm_viz_module, no_show):
     dataset = types.SimpleNamespace(
         data=np.random.rand(16, 16, 3),
         labels=["Height", "Amplitude", "Phase"],
-        scan_size_m={"image_size": 16, "scale_size": 5, "units": "um"},
+        scan_size_m={"image_size": 16, "scale_size": 5, "units": "µm"},
         sample="test_sample",
         path=Path("test_sample.ibw"),
     )
@@ -172,6 +184,8 @@ def test_afm_metric_helpers_are_public(afm_viz_module):
 
     assert metric_text == "1.12 deg"
     assert unit == "deg"
+    assert afm_viz_module.infer_afm_channel_unit("LatAmplitude", image * 1e-9) == "nm"
+    assert afm_viz_module.infer_afm_channel_unit("Amplitude", image * 1e-12) == "pm"
     assert afm_viz_module.should_show_metric_overlay("Height", multiple_plots=True)
     assert not afm_viz_module.should_show_metric_overlay("Phase", multiple_plots=True)
 
@@ -184,7 +198,7 @@ def test_render_afm_preview_returns_status_and_overlay(afm_viz_module, no_show):
         images=np.dstack([height, phase]),
         sample_name="demo",
         labels=["Height", "Phase"],
-        scan_size={"image_size": 8, "scale_size": 2, "units": "um"},
+        scan_size={"image_size": 8, "scale_size": 2, "units": "µm"},
     )
 
     rendered = afm_viz_module.render_afm_preview(

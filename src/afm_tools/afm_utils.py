@@ -262,25 +262,113 @@ def define_percentage_threshold(image: np.ndarray, percentage=(2, 98)) -> tuple[
 
 
 def convert_scan_setting(scan_size):
-    """Normalize scan-size inputs for scale-bar drawing."""
+    """Normalize scan-size inputs for scale-bar drawing.
+
+    Numeric scan sizes are in meters. The returned ``image_size`` and
+    ``scale_size`` are physical lengths in the returned unit, matching the
+    original hand-tuned AFM visualizer contract.
+    """
     if isinstance(scan_size, dict):
         return scan_size
     if isinstance(scan_size, (tuple, list)) and len(scan_size) == 3:
         return {"image_size": scan_size[0], "scale_size": scan_size[1], "units": scan_size[2]}
+    scan_size = flexible_round(float(scan_size))
+
+    scale_ranges = [
+        (2e-5, 5e-5, {"scale_size": 5, "units": "µm"}),
+        (1e-5, 2e-5, {"scale_size": 2, "units": "µm"}),
+        (3e-6, 1e-5, {"scale_size": 1, "units": "µm"}),
+        (2e-6, 3e-6, {"scale_size": 500, "units": "nm"}),
+        (1e-6, 2e-6, {"scale_size": 200, "units": "nm"}),
+        (5e-7, 1e-6, {"scale_size": 100, "units": "nm"}),
+        (2e-7, 5e-7, {"scale_size": 50, "units": "nm"}),
+        (1e-7, 2e-7, {"scale_size": 20, "units": "nm"}),
+        (5e-8, 1e-7, {"scale_size": 10, "units": "nm"}),
+        (3e-8, 5e-8, {"scale_size": 5, "units": "nm"}),
+        (2e-8, 3e-8, {"scale_size": 3, "units": "nm"}),
+        (1e-8, 2e-8, {"scale_size": 2, "units": "nm"}),
+        (5e-9, 1e-8, {"scale_size": 1, "units": "nm"}),
+        (3e-9, 5e-9, {"scale_size": 500, "units": "pm"}),
+        (2e-9, 3e-9, {"scale_size": 300, "units": "pm"}),
+        (1e-9, 2e-9, {"scale_size": 200, "units": "pm"}),
+        (5e-10, 1e-9, {"scale_size": 100, "units": "pm"}),
+        (3e-10, 5e-10, {"scale_size": 50, "units": "pm"}),
+        (2e-10, 3e-10, {"scale_size": 30, "units": "pm"}),
+        (1e-10, 2e-10, {"scale_size": 20, "units": "pm"}),
+        (1e-11, 1e-10, {"scale_size": 10, "units": "pm"}),
+    ]
+    unit_scale = {"pm": 1e-12, "nm": 1e-9, "µm": 1e-6, "um": 1e-6, "mm": 1e-3}
+
+    for min_val, max_val, scale_params in scale_ranges:
+        if min_val <= abs(scan_size) <= max_val:
+            setting = dict(scale_params)
+            setting["image_size"] = scan_size / unit_scale[setting["units"]]
+            return setting
     return {"image_size": scan_size, "scale_size": scan_size, "units": "m"}
 
 
-def convert_with_unit(value: float, unit: str = "m") -> str:
-    """Format a metric value using a compact engineering unit."""
+def flexible_round(value, sig_digits=1):
+    """Round a value by significant digits while preserving order of magnitude."""
     value = float(value)
-    if unit == "m":
-        for scale, suffix in ((1e-9, "nm"), (1e-6, "um"), (1e-3, "mm")):
+    if value == 0:
+        return value
+    magnitude = np.floor(np.log10(abs(value)))
+    factor = 10**magnitude
+    return round(value / factor, sig_digits) * factor
+
+
+_LENGTH_UNIT_SCALE = {
+    "fm": 1e-15,
+    "pm": 1e-12,
+    "nm": 1e-9,
+    "µm": 1e-6,
+    "um": 1e-6,
+    "mm": 1e-3,
+    "m": 1.0,
+}
+
+
+def convert_with_unit(value: float, unit: str = "m") -> str:
+    """Format a value with the compact AFM engineering unit style.
+
+    Length values stored in meters are shown with ``pm``, ``nm``, ``µm`` or
+    ``mm`` when possible. Passing an explicit unit scales to that unit, which
+    keeps metric text consistent with colorbar units.
+    """
+
+    value = float(value)
+    unit = unit or "m"
+    if unit in {"m", "meter", "meters"}:
+        for suffix, scale in (("pm", 1e-12), ("nm", 1e-9), ("µm", 1e-6), ("mm", 1e-3)):
             scaled = value / scale
-            if 1 <= abs(scaled) < 1000:
+            if abs(scaled) < 1000:
                 return f"{scaled:.2f} {suffix}"
+        return f"{value:.2e} m"
+
+    scale = _LENGTH_UNIT_SCALE.get(unit)
+    if scale is not None:
+        return f"{value / scale:.2f} {unit}"
     return f"{value:.2f} {unit}".strip()
 
 
 def format_func(value: float, unit: str = "") -> str:
-    """Format a value and suffix without changing scale."""
-    return f"{value:.2f}{unit}"
+    """Format compact colorbar tick text.
+
+    When ``unit`` is a length unit, values are scaled from meters into that
+    unit. When ``unit`` is empty, the value is formatted as-is; this is useful
+    after an image has already been scaled for display.
+    """
+
+    scale = _LENGTH_UNIT_SCALE.get(unit)
+    scaled = float(value) / scale if scale is not None else float(value)
+    if unit == "deg":
+        scaled = float(value)
+    if 0 < abs(scaled) < 0.01 or abs(scaled) >= 10000:
+        return f"{scaled:.1e}"
+    if abs(scaled) >= 100:
+        return f"{scaled:.1f}".rstrip("0").rstrip(".")
+    if abs(scaled) >= 10:
+        return f"{scaled:.1f}"
+    if abs(scaled) >= 1 or scaled == 0:
+        return f"{scaled:.2f}".rstrip("0").rstrip(".")
+    return f"{scaled:.2g}"

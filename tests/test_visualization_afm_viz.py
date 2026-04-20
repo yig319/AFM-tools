@@ -25,6 +25,7 @@ def afm_viz_module():
     sys.modules["afm_tools"] = pkg
 
     utils_stub = types.ModuleType("afm_tools.afm_utils")
+    utils_stub.MICRON_UNIT = "\u00b5m"
 
     def _convert_scan_setting(scan_size):
         if isinstance(scan_size, dict):
@@ -37,7 +38,7 @@ def afm_viz_module():
                 return f"{value * 1e12:.2f} pm"
             if abs(value) < 1e-6:
                 return f"{value * 1e9:.2f} nm"
-            return f"{value * 1e6:.2f} µm"
+            return f"{value * 1e6:.2f} {utils_stub.MICRON_UNIT}"
         if unit == "deg":
             return f"{value:.2f} deg"
         if unit == "nm":
@@ -155,7 +156,7 @@ def test_plot_afm_channels_accepts_loaded_dataset(afm_viz_module, no_show):
     dataset = types.SimpleNamespace(
         data=np.random.rand(16, 16, 3),
         labels=["Height", "Amplitude", "Phase"],
-        scan_size_m={"image_size": 16, "scale_size": 5, "units": "µm"},
+        scan_size_m={"image_size": 16, "scale_size": 5, "units": "\u00b5m"},
         sample="test_sample",
         path=Path("test_sample.ibw"),
     )
@@ -186,6 +187,10 @@ def test_afm_metric_helpers_are_public(afm_viz_module):
     assert unit == "deg"
     assert afm_viz_module.infer_afm_channel_unit("LatAmplitude", image * 1e-9) == "nm"
     assert afm_viz_module.infer_afm_channel_unit("Amplitude", image * 1e-12) == "pm"
+    assert afm_viz_module.infer_afm_channel_unit("Amplitude", image * 1e-9) == "nm"
+    assert afm_viz_module.infer_afm_channel_unit("Amplitude", image * 1e-6) == "\u00b5m"
+    assert afm_viz_module.infer_afm_channel_unit("LatAmplitude", image * 1e-3) == "nm"
+    assert afm_viz_module.scale_afm_channel_for_unit("LatAmplitude", image * 1e-3, "nm").max() == pytest.approx(3.0)
     assert afm_viz_module.should_show_metric_overlay("Height", multiple_plots=True)
     assert not afm_viz_module.should_show_metric_overlay("Phase", multiple_plots=True)
 
@@ -198,7 +203,7 @@ def test_render_afm_preview_returns_status_and_overlay(afm_viz_module, no_show):
         images=np.dstack([height, phase]),
         sample_name="demo",
         labels=["Height", "Phase"],
-        scan_size={"image_size": 8, "scale_size": 2, "units": "µm"},
+        scan_size={"image_size": 8, "scale_size": 2, "units": "\u00b5m"},
     )
 
     rendered = afm_viz_module.render_afm_preview(

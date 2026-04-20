@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from .afm_utils import convert_scan_setting, convert_with_unit, define_percentage_threshold, format_func
+from .afm_utils import MICRON_UNIT, convert_scan_setting, convert_with_unit, define_percentage_threshold, format_func
 from .viz_layout import layout_fig, scalebar as add_scalebar
 
 
@@ -101,7 +101,7 @@ class AFMVisualizer:
             return image
         if not self._setting("scale_image", True):
             return image
-        unit_scale = {"fm": 1e15, "pm": 1e12, "nm": 1e9, "µm": 1e6, "um": 1e6, "mm": 1e3}
+        unit_scale = {"fm": 1e15, "pm": 1e12, "nm": 1e9, MICRON_UNIT: 1e6, "um": 1e6, "mm": 1e3}
         scale = unit_scale.get(cbar_unit)
         if scale is None:
             return image
@@ -180,7 +180,7 @@ class AFMVisualizer:
         the scale bar, an existing ``fig``/``ax`` if you want layout control,
         and per-plot display choices such as ``title``, ``cmap``, and
         ``cbar_unit``. Height-like data stored in meters is scaled for colorbar
-        units of ``"nm"``, ``"µm"``, or ``"mm"``.
+        units of ``"nm"``, ``"um"``, or ``"mm"``.
         """
         image = np.asarray(img, dtype=float)
         image = self._scale_for_unit(image, cbar_unit)
@@ -619,58 +619,68 @@ def scale_afm_channel_for_display(channel_label: str, image: np.ndarray) -> tupl
 
 def scale_afm_channel_for_unit(channel_label: str, image: np.ndarray, unit: str) -> np.ndarray:
     """Scale one raw AFM/PFM channel for display in ``unit``."""
-    values = np.asarray(image, dtype=float)
-    normalized = channel_label.strip().lower().replace(" ", "")
     if unit == "deg":
-        return values
+        return np.asarray(image, dtype=float)
 
-    if "amplitude" in normalized and unit == "nm":
-        finite = values[np.isfinite(values)]
-        max_abs = float(np.nanmax(np.abs(finite))) if finite.size else 0.0
-        if max_abs == 0:
-            return values
-        if max_abs < 1e-6:
-            return values * 1e9
-        if max_abs < 1:
-            return values * 1e3
-        return values
-
-    unit_scale = {"fm": 1e15, "pm": 1e12, "nm": 1e9, "µm": 1e6, "um": 1e6, "mm": 1e3}
+    values_m = _length_values_in_meters(channel_label, image)
+    unit_scale = {"fm": 1e15, "pm": 1e12, "nm": 1e9, MICRON_UNIT: 1e6, "um": 1e6, "mm": 1e3}
     scale = unit_scale.get(unit)
-    return values * scale if scale is not None else values
+    return values_m * scale if scale is not None else np.asarray(image, dtype=float)
 
 
 def infer_afm_channel_unit(channel_label: str, image: np.ndarray, *, metric_value: float | None = None) -> str:
     """Infer a display unit for an AFM/PFM channel.
 
-    Phase-like channels use degrees. Lateral-amplitude channels default to nm,
-    while vertical amplitude defaults to pm, matching the manually tuned
-    AFM/PFM visualizer style.
-    Height, Z sensor, and deflection channels use adaptive length units chosen
-    from image variation, avoiding a fallback to raw meters.
+    Phase-like channels use degrees. Other channels are treated as length-like
+    data and choose an engineering length unit from the actual channel values,
+    avoiding a fallback to raw meters or a fixed unit per channel label.
     """
 
     normalized = channel_label.strip().lower().replace(" ", "")
     if "phase" in normalized:
         return "deg"
-    if normalized == "latamplitude":
+
+    if metric_value is not None and np.isfinite(metric_value):
+        values_m = _length_values_in_meters(channel_label, np.asarray([metric_value], dtype=float))
+    else:
+        values_m = _length_values_in_meters(channel_label, image)
+    finite = values_m[np.isfinite(values_m)]
+    reference = float(np.nanmax(np.abs(finite))) if finite.size else 0.0
+    if not np.isfinite(reference) or reference == 0:
         return "nm"
-    if "amplitude" in normalized:
-        return "pm"
 
-    length_keywords = ("height", "zsensor", "deflection")
-    if any(keyword in normalized for keyword in length_keywords):
-        reference = metric_value
-        if reference is None or not np.isfinite(reference) or reference == 0:
-            values = np.asarray(image, dtype=float)
-            finite = values[np.isfinite(values)]
-            reference = float(np.nanmax(np.abs(finite))) if finite.size else 0.0
-        unit_text = convert_with_unit(float(reference))
-        return unit_text.split()[-1] if " " in unit_text else "nm"
+    unit_text = convert_with_unit(reference)
+    return unit_text.split()[-1] if " " in unit_text else "nm"
 
-    metric = compute_rms_metric(image) if metric_value is None else float(metric_value)
-    unit_text = convert_with_unit(metric)
-    return unit_text.split()[-1] if " " in unit_text else ""
+
+def _length_values_in_meters(channel_label: str, image: np.ndarray) -> np.ndarray:
+    """Return length-like channel values normalized to meters."""
+    values = np.asarray(image, dtype=float)
+    normalized = channel_label.strip().lower().replace(" ", "")
+    if normalized == "latamplitude":
+        return values * _lat_amplitude_meter_scale(values)
+    return values
+
+
+def _lat_amplitude_meter_scale(values: np.ndarray) -> float:
+    """Infer the raw LatAmplitude length scale.
+
+    Asylum lateral-amplitude channels commonly arrive in micrometers, while
+    very small exported values are already in meters. Normalize both cases to
+    meters before choosing the display unit.
+    """
+    finite = np.asarray(values, dtype=float)
+    finite = finite[np.isfinite(finite)]
+    if finite.size == 0:
+        return 1.0
+    max_abs = float(np.nanmax(np.abs(finite)))
+    if not np.isfinite(max_abs) or max_abs == 0:
+        return 1.0
+    if max_abs < 1e-6:
+        return 1.0
+    if max_abs < 1:
+        return 1e-6
+    return 1e-9
 
 
 def should_show_metric_overlay(channel_label: str, *, multiple_plots: bool) -> bool:

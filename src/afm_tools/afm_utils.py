@@ -261,6 +261,9 @@ def define_percentage_threshold(image: np.ndarray, percentage=(2, 98)) -> tuple[
     return tuple(np.percentile(np.asarray(image)[np.isfinite(image)], percentage))
 
 
+MICRON_UNIT = "\u00b5m"
+
+
 def convert_scan_setting(scan_size):
     """Normalize scan-size inputs for scale-bar drawing.
 
@@ -275,9 +278,9 @@ def convert_scan_setting(scan_size):
     scan_size = flexible_round(float(scan_size))
 
     scale_ranges = [
-        (2e-5, 5e-5, {"scale_size": 5, "units": "µm"}),
-        (1e-5, 2e-5, {"scale_size": 2, "units": "µm"}),
-        (3e-6, 1e-5, {"scale_size": 1, "units": "µm"}),
+        (2e-5, 5e-5, {"scale_size": 5, "units": MICRON_UNIT}),
+        (1e-5, 2e-5, {"scale_size": 2, "units": MICRON_UNIT}),
+        (3e-6, 1e-5, {"scale_size": 1, "units": MICRON_UNIT}),
         (2e-6, 3e-6, {"scale_size": 500, "units": "nm"}),
         (1e-6, 2e-6, {"scale_size": 200, "units": "nm"}),
         (5e-7, 1e-6, {"scale_size": 100, "units": "nm"}),
@@ -297,7 +300,7 @@ def convert_scan_setting(scan_size):
         (1e-10, 2e-10, {"scale_size": 20, "units": "pm"}),
         (1e-11, 1e-10, {"scale_size": 10, "units": "pm"}),
     ]
-    unit_scale = {"pm": 1e-12, "nm": 1e-9, "µm": 1e-6, "um": 1e-6, "mm": 1e-3}
+    unit_scale = {"pm": 1e-12, "nm": 1e-9, MICRON_UNIT: 1e-6, "um": 1e-6, "mm": 1e-3}
 
     for min_val, max_val, scale_params in scale_ranges:
         if min_val <= abs(scan_size) <= max_val:
@@ -321,7 +324,7 @@ _LENGTH_UNIT_SCALE = {
     "fm": 1e-15,
     "pm": 1e-12,
     "nm": 1e-9,
-    "µm": 1e-6,
+    MICRON_UNIT: 1e-6,
     "um": 1e-6,
     "mm": 1e-3,
     "m": 1.0,
@@ -331,7 +334,7 @@ _LENGTH_UNIT_SCALE = {
 def convert_with_unit(value: float, unit: str = "m") -> str:
     """Format a value with the compact AFM engineering unit style.
 
-    Length values stored in meters are shown with ``pm``, ``nm``, ``µm`` or
+    Length values stored in meters are shown with ``pm``, ``nm``, ``um`` or
     ``mm`` when possible. Passing an explicit unit scales to that unit, which
     keeps metric text consistent with colorbar units.
     """
@@ -339,7 +342,7 @@ def convert_with_unit(value: float, unit: str = "m") -> str:
     value = float(value)
     unit = unit or "m"
     if unit in {"m", "meter", "meters"}:
-        for suffix, scale in (("pm", 1e-12), ("nm", 1e-9), ("µm", 1e-6), ("mm", 1e-3)):
+        for suffix, scale in (("pm", 1e-12), ("nm", 1e-9), (MICRON_UNIT, 1e-6), ("mm", 1e-3)):
             scaled = value / scale
             if abs(scaled) < 1000:
                 return f"{scaled:.2f} {suffix}"

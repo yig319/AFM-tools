@@ -12,6 +12,7 @@ from pathlib import Path
 import sys
 
 from matplotlib.transforms import Bbox
+import numpy as np
 import pytest
 
 PREVIEW_DIR = Path(__file__).resolve().parent
@@ -89,7 +90,7 @@ def _assert_scalebar_label_clear(axis):
     assert not Bbox.overlaps(patch_box, text_box)
 
 
-def test_sample_ibw_channel_units_are_restored():
+def test_sample_ibw_channel_units_follow_adaptive_length_rule():
     dataset = load_sample_dataset()
     units = {
         label: afm_viz.describe_afm_metric(label, dataset.images[:, :, index])[1]
@@ -106,12 +107,24 @@ def test_sample_ibw_channel_units_are_restored():
     assert units["ZSensor"] == "nm"
 
 
+def test_amplitude_units_are_adaptive_not_label_fixed():
+    pm_amplitude = np.array([[0.0, 5e-12], [1e-11, 5e-11]])
+    nm_amplitude = np.array([[0.0, 5e-10], [1e-9, 5e-9]])
+    um_amplitude = np.array([[0.0, 5e-7], [1e-6, 5e-6]])
+    lat_amplitude_um = np.array([[0.0, 5e-4], [1e-3, 2e-3]])
+
+    assert afm_viz.infer_afm_channel_unit("Amplitude", pm_amplitude) == "pm"
+    assert afm_viz.infer_afm_channel_unit("Amplitude", nm_amplitude) == "nm"
+    assert afm_viz.infer_afm_channel_unit("Amplitude", um_amplitude) == "\u00b5m"
+    assert afm_viz.infer_afm_channel_unit("LatAmplitude", lat_amplitude_um) == "nm"
+
+
 def test_sample_ibw_scalebar_uses_restored_physical_label():
     rendered = render_sample_preview(channels="preferred")
     axis = rendered.figure.axes[0]
     scale_text = next(text for text in axis.texts if "RMS =" not in text.get_text())
 
-    assert scale_text.get_text() == "2 µm"
+    assert scale_text.get_text() == "2 \u00b5m"
     _assert_scalebar_label_clear(axis)
 
 

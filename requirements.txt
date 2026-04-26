@@ -2,6 +2,7 @@
 # Keep this file as the single source of truth for package dependencies.
 numpy>=1.21.0
 matplotlib>=3.5.0
+sci-viz-utils>=0.1.0
 scipy>=1.7.0
 pandas>=1.3.0
 xrayutilities

@@ -75,6 +75,13 @@ Quick Start
    viz = AFMVisualizer()
    viz.viz(img=img, scan_size={"image_size": 256, "scale_size": 1, "units": "µm"})
 
+Usage Guide
+===========
+
+See ``USAGE.md`` for a practical guide to loading IBW files, plotting single
+channels, rendering multi-channel previews, and understanding what belongs in
+AFM-tools versus ``sci-viz-utils``.
+
 IBW Preview Style
 =================
 

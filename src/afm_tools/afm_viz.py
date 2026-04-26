@@ -8,8 +8,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
+from sci_viz_utils.figures import layout_fig, scalebar as add_scalebar
+
 from .afm_utils import MICRON_UNIT, convert_scan_setting, convert_with_unit, define_percentage_threshold, format_func
-from .viz_layout import layout_fig, scalebar as add_scalebar
 
 
 class AFMVisualizer:

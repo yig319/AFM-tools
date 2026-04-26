@@ -1,5 +1,6 @@
 # Development requirements.
 # Includes runtime dependencies plus test/build/doc tooling.
+-e ../sci-viz-utils
 -r requirements.txt
 
 pytest

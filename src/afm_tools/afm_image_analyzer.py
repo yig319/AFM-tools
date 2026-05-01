@@ -10,6 +10,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from sci_viz_utils.figures import imshow_percentile, layout_fig, show_images
 
 from afm_tools.afm_utils import get_channel, load_ibw
 
@@ -41,9 +42,10 @@ def fit_background(img: np.ndarray, degrees=(3, 3), viz: bool = False):
     flattened = img - background
 
     if viz:
-        fig, axes = plt.subplots(1, 3, figsize=(9, 2.5))
+        fig, axes = layout_fig(3, mod=3, figsize=(9, 2.5))
+        axes = np.asarray(axes).ravel()
         for ax, data, title in zip(axes, [img, background, flattened], ["original", "background", "flattened"]):
-            im = ax.imshow(data)
+            im = imshow_percentile(ax, data, colorbar=False)
             ax.set_title(title)
             fig.colorbar(im, ax=ax)
         fig.tight_layout()
@@ -78,9 +80,10 @@ def remove_surface_particles(img: np.ndarray, threshold: float = 3, viz: bool = 
     out[out > mean + threshold * std] = mean
 
     if viz:
-        fig, axes = plt.subplots(1, 3, figsize=(9, 2.5))
+        fig, axes = layout_fig(3, mod=3, figsize=(9, 2.5))
+        axes = np.asarray(axes).ravel()
         for ax, data, title in zip(axes, [img, img - out, out], ["original", "particles", "cleaned"]):
-            im = ax.imshow(data)
+            im = imshow_percentile(ax, data, colorbar=False)
             ax.set_title(title)
             fig.colorbar(im, ax=ax)
         fig.tight_layout()
@@ -184,17 +187,17 @@ def plot_channels(image, max_channels: int = 6, cmap: str = "viridis"):
 
     data = image.data
     n_channels = 1 if data.ndim == 2 else min(data.shape[2], max_channels)
-    fig, axes = plt.subplots(1, n_channels, figsize=(3 * n_channels, 3), squeeze=False)
-    for i, ax in enumerate(axes.ravel()):
-        channel = get_channel(image, index=i)
-        finite = channel[np.isfinite(channel)]
-        vmin, vmax = np.percentile(finite, [1, 99]) if finite.size else (None, None)
-        im = ax.imshow(channel, cmap=cmap, vmin=vmin, vmax=vmax)
-        title = image.labels[i] if i < len(image.labels) else f"channel {i}"
-        ax.set_title(title)
-        ax.set_xticks([])
-        ax.set_yticks([])
-        fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    channels = [get_channel(image, index=i) for i in range(n_channels)]
+    labels = [image.labels[i] if i < len(image.labels) else f"channel {i}" for i in range(n_channels)]
+    fig, axes = show_images(
+        channels,
+        labels=labels,
+        img_per_row=n_channels,
+        img_height=3,
+        cmap=cmap,
+        show_colorbar=True,
+        clim="auto",
+    )
     fig.suptitle(image.path.name)
     fig.tight_layout()
-    return fig, axes.ravel()
+    return fig, np.asarray(axes).ravel()

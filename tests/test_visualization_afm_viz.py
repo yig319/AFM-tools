@@ -57,6 +57,26 @@ def afm_viz_module():
     utils_stub.convert_with_unit = _convert_with_unit
     utils_stub.define_percentage_threshold = _define_percentage_threshold
     utils_stub.format_func = _format_func
+
+    def _get_channel(img, *, label_contains=None, index=None):
+        data = np.asarray(getattr(img, "data", img), dtype=float)
+        if data.ndim == 3 and index is not None and index < data.shape[2]:
+            return data[:, :, index]
+        if data.ndim == 3:
+            return data[:, :, 0]
+        return data
+
+    def _load_ibw(path):
+        return types.SimpleNamespace(
+            data=np.random.rand(16, 16, 3),
+            sample="test",
+            labels=["Height", "Amplitude", "Phase"],
+            scan_size_m={"image_size": 16, "scale_size": 5, "units": "µm"},
+        )
+
+    utils_stub.get_channel = _get_channel
+    utils_stub.load_ibw = _load_ibw
+    utils_stub.AFMImage = type("AFMImage", (), {})
     sys.modules["afm_tools.afm_utils"] = utils_stub
 
     _load_module("afm_tools.viz_layout", src_dir / "viz_layout.py")
@@ -66,7 +86,11 @@ def afm_viz_module():
     def _find_histogram_peaks(image, **kwargs):
         return np.array([float(np.median(image))]), np.array([image.size])
 
+    def _normalize_phase(phase):
+        return np.asarray(phase, dtype=float)
+
     domain_stub.find_histogram_peaks = _find_histogram_peaks
+    domain_stub.normalize_phase = _normalize_phase
     sys.modules["afm_tools.domain_analysis"] = domain_stub
 
     module = _load_module("afm_tools.afm_viz", src_dir / "afm_viz.py")
@@ -143,11 +167,21 @@ def test_afm_visualizer_can_use_matplotlib_colorbar_style(afm_viz_module):
     assert colorbar_axis.get_ylabel() == "nm"
 
 
-def test_show_pfm_images_saves_figure(afm_viz_module, no_show, tmp_path):
-    imgs = np.random.rand(16, 16, 6)
-    labels = [f"img_{i}" for i in range(6)]
-    out_file = tmp_path / "pfm_grid.png"
-    afm_viz_module.show_pfm_images(imgs, labels, fig_name=out_file)
+def test_show_topography_grid_saves_figure(afm_viz_module, no_show, tmp_path):
+    img = types.SimpleNamespace(
+        data=np.random.rand(16, 16, 3),
+        sample="test_sample",
+        labels=["Height", "Amplitude", "Phase"],
+        scan_size_m={"image_size": 16, "scale_size": 5, "units": "µm"},
+    )
+    fig, axes = afm_viz_module.show_topography_grid(
+        [img],
+        labels=["test"],
+        channel="Height",
+        show_metric_overlay=False,
+    )
+    out_file = tmp_path / "topo_grid.png"
+    fig.savefig(out_file)
     assert out_file.exists()
     assert out_file.stat().st_size > 0
 

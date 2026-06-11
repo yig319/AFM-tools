@@ -15,6 +15,7 @@ from sci_viz_utils.figures import imshow_percentile, layout_fig, show_images
 from afm_tools.afm_utils import get_channel, load_ibw
 
 
+# Fit a 2D polynomial surface z(x,y) of degree (kx,ky) via least squares.
 def polyfit2d(x, y, z, kx=3, ky=3, order=None):
     """Two dimensional polynomial fitting by least squares."""
     x, y = np.meshgrid(x, y)
@@ -31,6 +32,7 @@ def polyfit2d(x, y, z, kx=3, ky=3, order=None):
     return np.linalg.lstsq(a.T, np.ravel(z), rcond=None)
 
 
+# Fit and subtract a 2D polynomial background from an AFM image, with optional debug plot.
 def fit_background(img: np.ndarray, degrees=(3, 3), viz: bool = False):
     """Fit and subtract a 2D polynomial background."""
     import matplotlib.pyplot as plt
@@ -53,6 +55,7 @@ def fit_background(img: np.ndarray, degrees=(3, 3), viz: bool = False):
     return flattened, background
 
 
+# Subtract a fitted 1st- or 2nd-order polynomial plane from an AFM height image.
 def flatten_plane(image: np.ndarray, order: int = 1) -> np.ndarray:
     """Subtract a fitted plane or low-order polynomial background."""
     image = np.asarray(image, dtype=float)
@@ -67,6 +70,7 @@ def flatten_plane(image: np.ndarray, order: int = 1) -> np.ndarray:
     return image - background
 
 
+# Replace outlier pixels (surface particles/dust) with the image mean, using std thresholding.
 def remove_surface_particles(img: np.ndarray, threshold: float = 3, viz: bool = False) -> np.ndarray:
     """Replace outlier pixels with the image mean."""
     import matplotlib.pyplot as plt
@@ -91,6 +95,7 @@ def remove_surface_particles(img: np.ndarray, threshold: float = 3, viz: bool = 
     return out
 
 
+# Replace statistical outlier pixels (>> N std from median) with the median value.
 def remove_outliers(image: np.ndarray, threshold: float = 4.0) -> np.ndarray:
     """Replace pixels farther than ``threshold`` standard deviations with the median."""
     image = np.asarray(image, dtype=float)
@@ -104,6 +109,7 @@ def remove_outliers(image: np.ndarray, threshold: float = 4.0) -> np.ndarray:
     return out
 
 
+# Compute root-mean-square (RMS / Sq) roughness of finite pixels in a height array.
 def afm_RMS_roughness(height: np.ndarray) -> float:
     """Return root-mean-square roughness of finite pixels in the input array."""
     height = np.asarray(height, dtype=float)
@@ -114,11 +120,13 @@ def afm_RMS_roughness(height: np.ndarray) -> float:
     return float(np.sqrt(np.mean((height - avg) ** 2)))
 
 
+# Alias for afm_RMS_roughness — kept for backward compatibility.
 def rms_roughness(height: np.ndarray) -> float:
     """Alias for :func:`afm_RMS_roughness`."""
     return afm_RMS_roughness(height)
 
 
+# Extract a nearest-pixel line profile between two (row, col) points in an image.
 def calculate_height_profile(image: np.ndarray, p0: tuple[int, int], p1: tuple[int, int]):
     """Return a nearest-pixel line profile between two `(row, col)` points."""
     image = np.asarray(image)
@@ -129,11 +137,13 @@ def calculate_height_profile(image: np.ndarray, p0: tuple[int, int], p1: tuple[i
     return np.arange(len(rr)), image[rr, cc]
 
 
+# Alias for calculate_height_profile — kept for backward compatibility.
 def line_profile(image: np.ndarray, p0: tuple[int, int], p1: tuple[int, int]):
     """Alias for :func:`calculate_height_profile`."""
     return calculate_height_profile(image, p0, p1)
 
 
+# Compute the fraction of pixels above a threshold (Otsu or user-supplied) — used for PFM domain ratio.
 def domain_fraction(image: np.ndarray, threshold: float | None = None):
     """Return positive-domain fraction, binary mask, and threshold."""
     image = np.asarray(image, dtype=float)
@@ -148,6 +158,7 @@ def domain_fraction(image: np.ndarray, threshold: float | None = None):
     return float(np.nanmean(mask)), mask, threshold
 
 
+# Compute RMS roughness for a batch of IBW files, returning a pandas DataFrame.
 def roughness_summary(files, channel_index: int = 0, flatten: bool = True, sample_parser=None) -> pd.DataFrame:
     """Compute RMS roughness for a list of IBW files."""
     rows: list[dict[str, object]] = []
@@ -177,27 +188,13 @@ def roughness_summary(files, channel_index: int = 0, flatten: bool = True, sampl
     return pd.DataFrame(rows)
 
 
+# Quick-look grid plot of AFM/PFM channels — thin redirect to afm_viz.plot_afm_channels.
 def plot_channels(image, max_channels: int = 6, cmap: str = "viridis"):
-    """Quick-look plot for channels in an ``AFMImage``.
+    """Quick-look plot for channels in an ``AFMImage`` — redirects to :func:`afm_viz.plot_afm_channels`.
 
-    This is intentionally simple. Use ``afm_tools.afm_viz.render_afm_preview``
-    for the polished PLD_workflow-style preview with scale bars and units.
+    Kept for backward compatibility. All new code should call
+    ``afm_tools.afm_viz.plot_afm_channels`` directly.
     """
-    import matplotlib.pyplot as plt
+    from .afm_viz import plot_afm_channels
 
-    data = image.data
-    n_channels = 1 if data.ndim == 2 else min(data.shape[2], max_channels)
-    channels = [get_channel(image, index=i) for i in range(n_channels)]
-    labels = [image.labels[i] if i < len(image.labels) else f"channel {i}" for i in range(n_channels)]
-    fig, axes = show_images(
-        channels,
-        labels=labels,
-        img_per_row=n_channels,
-        img_height=3,
-        cmap=cmap,
-        show_colorbar=True,
-        clim="auto",
-    )
-    fig.suptitle(image.path.name)
-    fig.tight_layout()
-    return fig, np.asarray(axes).ravel()
+    return plot_afm_channels(image, max_channels=max_channels, n_cols=max_channels, cmap=cmap, scalebar=False, show_metric_overlay=False)

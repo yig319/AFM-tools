@@ -5,6 +5,7 @@ import numpy as np
 from afm_tools.afm_image_analyzer import domain_fraction
 
 
+# Find the dominant histogram peaks in an AFM/PFM image (e.g. for phase domain separation).
 def find_histogram_peaks(
     image,
     bins: int = 256,
@@ -42,4 +43,31 @@ def find_histogram_peaks(
         plt.show()
 
     return peak_values, peak_counts
+
+
+# Shift PFM phase data so the lower histogram peak (down domains) sits near 0 degrees.
+def normalize_phase(phase: np.ndarray) -> np.ndarray:
+    """Shift PFM phase data so the lower histogram peak sits near 0.
+
+    Splits the phase histogram at the median, then subtracts the median
+    of the lower half. This positions the lower domain population at ~0
+    regardless of tails or noise, while preserving the original peak
+    separation and data shape.
+
+    When standard PFM phase data covers 0–180° (or 0–270°) for up/down
+    domains, the shifted colorbar shows a clean 0-to-upward range via
+    the existing percentile or std-based clim logic.
+    """
+    phase = np.asarray(phase, dtype=float)
+    valid = phase[np.isfinite(phase)]
+    if valid.size == 0:
+        return phase
+
+    median = float(np.nanmedian(valid))
+    below = valid[valid < median]
+    if below.size == 0:
+        return phase
+
+    shift = float(np.nanmedian(below))
+    return phase - shift
 

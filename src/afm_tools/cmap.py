@@ -13,6 +13,7 @@ AFM_CMAPS = {
 }
 
 
+# Look up a matplotlib colormap by AFM/PFM channel label (height→viridis, phase→twilight).
 def get_afm_cmap(channel_label: str | None = None, default: str = "viridis"):
     """Return a matplotlib colormap suited to a common AFM/PFM channel label."""
     label = (channel_label or "").replace(" ", "").lower()

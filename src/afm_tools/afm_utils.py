@@ -39,12 +39,14 @@ class AFMImage:
     notes: dict[str, str]
 
 
+# Decode raw bytes to latin-1 string (handles mixed bytes/str from Igor binary reader).
 def _decode(value) -> str:
     if isinstance(value, bytes):
         return value.decode("latin-1", errors="ignore")
     return str(value)
 
 
+# Try to import an Igor Binary Wave reader from bundled or external packages.
 def _binarywave_loader():
     try:
         from afm_tools.igor import igor as binarywave
@@ -72,6 +74,7 @@ def _binarywave_loader():
                     ) from exc2
 
 
+# Parse the free-form Igor note text into a dict of key-value metadata strings.
 def parse_notes(note: str) -> dict[str, str]:
     """Parse the free-form Igor note text into a dictionary of metadata."""
     pattern = r"([\w\s]+):\s*([^\r]+)"
@@ -88,6 +91,7 @@ def parse_notes(note: str) -> dict[str, str]:
     return notes
 
 
+# Extract the physical scan size in meters from parsed notes, falling back to regex on raw note text.
 def _parse_scan_size_m(notes: dict[str, str], note: str) -> float | None:
     raw = notes.get("ScanSize") or notes.get("Scan Size") or notes.get("FastScanSize")
     if raw is not None:
@@ -107,6 +111,7 @@ def _parse_scan_size_m(notes: dict[str, str], note: str) -> float | None:
     return None
 
 
+# Convert a value-with-unit string (e.g. "5 um", "10 nm") to metres.
 def _value_with_unit_to_m(text: str) -> float:
     match = re.search(r"([-+0-9.eE]+)\s*([A-Za-z]*)", str(text))
     if not match:
@@ -122,6 +127,7 @@ def _value_with_unit_to_m(text: str) -> float:
     return value
 
 
+# Infer channel labels from wave metadata, applying known Asylum PFM/AC-mode label reordering.
 def _labels_from_wave(wave, notes: dict[str, str], data: np.ndarray, mode: str | None) -> list[str]:
     labels_current: list[str] = []
     try:
@@ -170,6 +176,7 @@ def _labels_from_wave(wave, notes: dict[str, str], data: np.ndarray, mode: str |
     return labels_current or ["height"]
 
 
+# Load an Asylum/Igor .ibw AFM/PFM image stack into a named AFMImage container.
 def load_ibw(path: str | Path, mode: str | None = None, reorder_channels: bool = True) -> AFMImage:
     """Load an Asylum/Igor ``.ibw`` AFM/PFM image stack.
 
@@ -232,6 +239,7 @@ def load_ibw(path: str | Path, mode: str | None = None, reorder_channels: bool =
     )
 
 
+# Legacy tuple-API wrapper around load_ibw: returns (images, sample_name, labels, scan_size_m).
 def parse_ibw(file: str | Path, mode: str | None = None):
     """Return the legacy tuple API: ``(images, sample_name, labels, scan_size_m)``.
 
@@ -242,6 +250,7 @@ def parse_ibw(file: str | Path, mode: str | None = None):
     return image.data, image.sample, image.labels, image.scan_size_m
 
 
+# Return one 2D channel from an AFMImage or raw numpy stack, by label substring or index.
 def get_channel(image: AFMImage | np.ndarray, index: int = 0, label_contains: str | None = None) -> np.ndarray:
     """Return one channel from an :class:`AFMImage` or raw image stack."""
     data = image.data if isinstance(image, AFMImage) else np.asarray(image)
@@ -256,6 +265,7 @@ def get_channel(image: AFMImage | np.ndarray, index: int = 0, label_contains: st
     return data[:, :, index]
 
 
+# Return (low, high) percentile limits from the finite pixels of an image — used for colorbar clipping.
 def define_percentage_threshold(image: np.ndarray, percentage=(2, 98)) -> tuple[float, float]:
     """Return finite-data percentile limits for image display."""
     return tuple(np.percentile(np.asarray(image)[np.isfinite(image)], percentage))
@@ -264,6 +274,7 @@ def define_percentage_threshold(image: np.ndarray, percentage=(2, 98)) -> tuple[
 MICRON_UNIT = "\u00b5m"
 
 
+# Normalize scan-size inputs (meters, tuple, or dict) into a dict for scale-bar drawing.
 def convert_scan_setting(scan_size):
     """Normalize scan-size inputs for scale-bar drawing.
 
@@ -310,6 +321,7 @@ def convert_scan_setting(scan_size):
     return {"image_size": scan_size, "scale_size": scan_size, "units": "m"}
 
 
+# Round a value to a given number of significant digits while preserving order of magnitude.
 def flexible_round(value, sig_digits=1):
     """Round a value by significant digits while preserving order of magnitude."""
     value = float(value)
@@ -331,6 +343,7 @@ _LENGTH_UNIT_SCALE = {
 }
 
 
+# Format a value (stored in metres) to a human-readable engineering-unit string (pm, nm, µm, mm).
 def convert_with_unit(value: float, unit: str = "m") -> str:
     """Format a value with the compact AFM engineering unit style.
 
@@ -354,6 +367,7 @@ def convert_with_unit(value: float, unit: str = "m") -> str:
     return f"{value:.2f} {unit}".strip()
 
 
+# Format compact colorbar tick text — scales values from metres to the given display unit.
 def format_func(value: float, unit: str = "") -> str:
     """Format compact colorbar tick text.
 

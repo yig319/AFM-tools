@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 
+# Render a 2D height map as a 3D surface plot.
 def plot_surface_3d(height, scan_size=None, ax=None, cmap: str = "viridis", stride: int = 1):
     """Plot a height map as a 3D surface and return ``(fig, ax)``.
 
